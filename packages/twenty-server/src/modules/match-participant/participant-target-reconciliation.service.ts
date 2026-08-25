@@ -7,7 +7,6 @@ import { In, type ObjectLiteral } from 'typeorm';
 import { GlobalWorkspaceOrmManager } from 'src/engine/twenty-orm/global-workspace-datasource/global-workspace-orm.manager';
 import { type WorkspaceTransactionScope } from 'src/engine/twenty-orm/global-workspace-datasource/types/workspace-transaction-scope.type';
 import { type WorkspaceRepositoryV2 } from 'src/engine/twenty-orm-v2/repository/workspace-repository-v2';
-import { type CalendarEventParticipantWorkspaceEntity } from 'src/modules/calendar/common/standard-objects/calendar-event-participant.workspace-entity';
 import { type MessageParticipantWorkspaceEntity } from 'src/modules/messaging/common/standard-objects/message-participant.workspace-entity';
 import { type MessageWorkspaceEntity } from 'src/modules/messaging/common/standard-objects/message.workspace-entity';
 import {
@@ -35,28 +34,17 @@ export class ParticipantTargetReconciliationService {
   ) {}
 
   public async reconcileParticipantTargets({
-    participants,
+    sourceRecordIds,
     objectMetadataName,
     transactionScope,
   }: {
-    participants: (
-      | Pick<MessageParticipantWorkspaceEntity, 'messageId'>
-      | Pick<CalendarEventParticipantWorkspaceEntity, 'calendarEventId'>
-    )[];
+    sourceRecordIds: string[];
     objectMetadataName: 'messageParticipant' | 'calendarEventParticipant';
     transactionScope?: WorkspaceTransactionScope;
   }): Promise<void> {
     if (objectMetadataName === 'messageParticipant') {
       await this.reconcileMessageThreadTargetsFromMessageIds({
-        messageIds: participants.map(
-          (participant) =>
-            (
-              participant as Pick<
-                MessageParticipantWorkspaceEntity,
-                'messageId'
-              >
-            ).messageId,
-        ),
+        messageIds: sourceRecordIds,
         transactionScope,
       });
 
@@ -64,15 +52,7 @@ export class ParticipantTargetReconciliationService {
     }
 
     await this.reconcileCalendarEventTargets({
-      calendarEventIds: participants.map(
-        (participant) =>
-          (
-            participant as Pick<
-              CalendarEventParticipantWorkspaceEntity,
-              'calendarEventId'
-            >
-          ).calendarEventId,
-      ),
+      calendarEventIds: sourceRecordIds,
       transactionScope,
     });
   }
@@ -139,8 +119,26 @@ export class ParticipantTargetReconciliationService {
       ),
     ];
 
-    for (const messageThreadIdChunk of chunk(
+    await this.reconcileMessageThreadTargets({
       messageThreadIds,
+      transactionScope,
+    });
+  }
+
+  public async reconcileMessageThreadTargets({
+    messageThreadIds,
+    transactionScope,
+  }: {
+    messageThreadIds: string[];
+    transactionScope?: WorkspaceTransactionScope;
+  }): Promise<void> {
+    const messageRepository = await this.getRepository<MessageWorkspaceEntity>(
+      'message',
+      transactionScope,
+    );
+
+    for (const messageThreadIdChunk of chunk(
+      [...new Set(messageThreadIds)],
       RECONCILIATION_CHUNK_SIZE,
     )) {
       const threadMessages = await messageRepository.find({

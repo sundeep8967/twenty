@@ -7,6 +7,7 @@ import { In, MoreThan } from 'typeorm';
 import { GlobalWorkspaceOrmManager } from 'src/engine/twenty-orm/global-workspace-datasource/global-workspace-orm.manager';
 import { type WorkspaceRepositoryV2 } from 'src/engine/twenty-orm-v2/repository/workspace-repository-v2';
 import { buildSystemAuthContext } from 'src/engine/twenty-orm/utils/build-system-auth-context.util';
+import { ParticipantTargetReconciliationService } from 'src/modules/match-participant/participant-target-reconciliation.service';
 import { type MessageChannelMessageAssociationWorkspaceEntity } from 'src/modules/messaging/common/standard-objects/message-channel-message-association.workspace-entity';
 import { type MessageThreadWorkspaceEntity } from 'src/modules/messaging/common/standard-objects/message-thread.workspace-entity';
 import { type MessageWorkspaceEntity } from 'src/modules/messaging/common/standard-objects/message.workspace-entity';
@@ -18,6 +19,7 @@ export class MessagingMessageCleanerService {
   private readonly logger = new Logger(MessagingMessageCleanerService.name);
   constructor(
     private readonly globalWorkspaceOrmManager: GlobalWorkspaceOrmManager,
+    private readonly participantTargetReconciliationService: ParticipantTargetReconciliationService,
   ) {}
 
   async deleteMessagesChannelMessageAssociationsAndRelatedOrphans({
@@ -109,11 +111,18 @@ export class MessagingMessageCleanerService {
                   this.findReferencedThreadIds(messageRepository, threadIds),
               );
 
-              if (orphanThreadIds.length <= 0) {
-                continue;
+              if (orphanThreadIds.length > 0) {
+                await messageThreadRepository.delete(orphanThreadIds);
               }
 
-              await messageThreadRepository.delete(orphanThreadIds);
+              await this.participantTargetReconciliationService.reconcileMessageThreadTargets(
+                {
+                  messageThreadIds: candidateThreadIds.filter(
+                    (threadId) => !orphanThreadIds.includes(threadId),
+                  ),
+                  transactionScope,
+                },
+              );
             }
           },
         );
@@ -198,7 +207,33 @@ export class MessagingMessageCleanerService {
 
                 return page.map(({ id }) => id);
               },
-              (ids) => messageRepository.delete(ids),
+              async (ids) => {
+                const messagesToDelete = await messageRepository.find({
+                  where: { id: In(ids) },
+                  select: { messageThreadId: true },
+                });
+                const candidateThreadIds = [
+                  ...new Set(
+                    messagesToDelete
+                      .map(({ messageThreadId }) => messageThreadId)
+                      .filter(isDefined),
+                  ),
+                ];
+
+                await messageRepository.delete(ids);
+
+                const survivingThreadIds = await this.findReferencedThreadIds(
+                  messageRepository,
+                  candidateThreadIds,
+                );
+
+                await this.participantTargetReconciliationService.reconcileMessageThreadTargets(
+                  {
+                    messageThreadIds: survivingThreadIds,
+                    transactionScope,
+                  },
+                );
+              },
               (pageIds) =>
                 this.filterOrphans(pageIds, (ids) =>
                   this.findReferencedMessageIds(
