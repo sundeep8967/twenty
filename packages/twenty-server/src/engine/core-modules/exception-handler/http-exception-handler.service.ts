@@ -77,7 +77,11 @@ export class HttpExceptionHandlerService {
     workspace?: ExceptionHandlerWorkspace,
     {
       shouldBeCapturedBySentry = true,
-    }: { shouldBeCapturedBySentry?: boolean } = {},
+      responseBody,
+    }: {
+      shouldBeCapturedBySentry?: boolean;
+      responseBody?: Record<string, unknown>;
+    } = {},
   ): Response | undefined => {
     const params = this.request?.params;
 
@@ -124,11 +128,13 @@ export class HttpExceptionHandlerService {
       shouldBeCapturedBySentry,
     });
 
-    return response.status(statusCode).send({
-      statusCode,
-      error: exception.name ?? getErrorNameFromStatusCode(statusCode),
-      messages: [exception?.message],
-      code: exception instanceof CustomError ? exception.code : undefined,
-    });
+    return response.status(statusCode).send(
+      responseBody ?? {
+        statusCode,
+        error: exception.name ?? getErrorNameFromStatusCode(statusCode),
+        messages: [exception?.message],
+        code: exception instanceof CustomError ? exception.code : undefined,
+      },
+    );
   };
 }
