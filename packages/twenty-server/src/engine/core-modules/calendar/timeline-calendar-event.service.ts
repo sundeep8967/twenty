@@ -74,7 +74,7 @@ export class TimelineCalendarEventService {
             { shouldBypassPermissionChecks: true },
           );
 
-        const where = targetFilter
+        const where = isDefined(targetFilter)
           ? {
               calendarEventTargets: {
                 [targetFilter.fieldName]: targetFilter.recordId,
