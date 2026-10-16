@@ -134,7 +134,7 @@ export class ActorFromAuthContextService {
     const existingValue = record[fieldName] as ActorMetadata | undefined;
 
     if (fieldName === 'createdBy') {
-      if (actorMetadata && (!existingValue || !existingValue.name)) {
+      if (actorMetadata) {
         record[fieldName] = {
           ...actorMetadata,
           source: existingValue?.source ?? actorMetadata.source,

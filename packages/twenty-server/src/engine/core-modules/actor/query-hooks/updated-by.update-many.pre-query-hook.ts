@@ -34,9 +34,11 @@ export class UpdatedByUpdateManyPreQueryHook implements WorkspacePreQueryHookIns
       );
     }
 
+    const { createdBy: _createdBy, ...dataWithoutCreatedBy } = payload.data;
+
     const [recordToUpdateData] =
       await this.actorFromAuthContextService.injectUpdatedBy({
-        records: [payload.data],
+        records: [dataWithoutCreatedBy],
         objectMetadataNameSingular: objectName,
         authContext,
       });
