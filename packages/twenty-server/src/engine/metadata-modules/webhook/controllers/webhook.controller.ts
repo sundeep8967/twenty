@@ -38,8 +38,8 @@ import { WorkspaceMigrationRunnerRestApiExceptionFilter } from 'src/engine/works
   SettingsPermissionGuard(PermissionFlagType.API_KEYS_AND_WEBHOOKS),
 )
 @UseFilters(
-  PermissionsRestApiExceptionFilter,
   RestApiExceptionFilter,
+  PermissionsRestApiExceptionFilter,
   FlatEntityMapsRestApiExceptionFilter,
   WorkspaceMigrationRunnerRestApiExceptionFilter,
 )

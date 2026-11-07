@@ -41,7 +41,7 @@ import { PermissionsRestApiExceptionFilter } from 'src/engine/metadata-modules/p
   WorkspaceAuthGuard,
   SettingsPermissionGuard(PermissionFlagType.API_KEYS_AND_WEBHOOKS),
 )
-@UseFilters(PermissionsRestApiExceptionFilter, RestApiExceptionFilter)
+@UseFilters(RestApiExceptionFilter, PermissionsRestApiExceptionFilter)
 export class ApiKeyController {
   constructor(private readonly apiKeyService: ApiKeyService) {}
 
